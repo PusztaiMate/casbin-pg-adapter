@@ -113,23 +113,37 @@ func createCasbinDatabase(arg interface{}, dbname string) (*pg.DB, error) {
 	} else {
 		opts, ok = arg.(*pg.Options)
 		if !ok {
-			return nil, fmt.Errorf("must pass in a PostgreS URL string or an instance of *pg.Options, received %T instead", arg)
+			return nil, fmt.Errorf("must pass in a PostgreSQL URL string or an instance of *pg.Options, received %T instead", arg)
 		}
 	}
 
 	db := pg.Connect(opts)
 	defer db.Close()
 
-	_, err = db.Exec(fmt.Sprintf("CREATE DATABASE %s", dbname))
-	if err != nil && !strings.Contains(err.Error(), "42P04") {
-		return nil, err
+	var exists bool
+	_, err = db.QueryOne(pg.Scan(&exists), "SELECT EXISTS (SELECT 1 FROM pg_database WHERE datname = ?)", dbname)
+	if err != nil {
+		return nil, fmt.Errorf("error checking database existence: %v", err)
 	}
+
+	if !exists {
+		_, err = db.Exec(fmt.Sprintf("CREATE DATABASE %s", dbname))
+		if err != nil {
+			return nil, fmt.Errorf("error creating database: %v", err)
+		}
+	}
+
 	db.Close()
 
 	opts.Database = dbname
-	db = pg.Connect(opts)
+	newDB := pg.Connect(opts)
 
-	return db, nil
+	if err := newDB.Ping(context.Background()); err != nil {
+		newDB.Close()
+		return nil, fmt.Errorf("error connecting to new database: %v", err)
+	}
+
+	return newDB, nil
 }
 
 // Close close database connection
