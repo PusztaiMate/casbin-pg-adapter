@@ -1,7 +1,7 @@
 package main
 
 import (
-	pgadapter "github.com/casbin/casbin-pg-adapter"
+	pgadapter "github.com/PusztaiMate/casbin-pg-adapter"
 	"github.com/casbin/casbin/v2"
 )
 
